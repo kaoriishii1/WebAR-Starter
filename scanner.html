@@ -1,30 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta charset="utf-8">
-    <title>WebAR Scanner</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <style>
-      body { margin:0; background:#000; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-      #ui { position:fixed; top:0; left:0; right:0; z-index:3; display:flex; gap:.5rem; align-items:center; padding:.5rem .75rem; color:#eee; }
-      #badge { background:#111; padding:.2rem .5rem; border-radius:.4rem; font-weight:600; }
-      #status { opacity:.9; }
-    </style>  
-    
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.aframe.js"></script>
-  </head>
-  <body>
-    <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-plane color="blue" opaciy="0.5" position="0 0 0" height="0.552" width="1" rotation="0 0 0"></a-plane>
-      </a-entity>
-    </a-scene>
-  </body>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebAR Scanner (Local)</title>
+  <script src="./lib/aframe.min.js"></script>
+  <script src="./lib/mindar-image-aframe.prod.js"></script>
+</head>
+<body>
+  <a-scene
+    mindar-image="imageTargetSrc: ./targets/targets.mind"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+    embedded
+  >
+    <a-entity mindar-image-target="targetIndex: 0">
+      <a-box color="#39FF14" width="0.3" height="0.3" depth="0.3"
+             position="0 0 0" rotation="-90 0 0"></a-box>
+    </a-entity>
+
+    <!-- Remove this block if you compiled only one image -->
+    <a-entity mindar-image-target="targetIndex: 1">
+      <a-plane color="#2266ff" width="1" height="1" rotation="-90 0 0"></a-plane>
+    </a-entity>
+
+    <a-camera position="0 0 0"></a-camera>
+  </a-scene>
+</body>
 </html>
-
-
