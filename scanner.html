@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebAR Scanner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./lib/aframe.min.js"></script>
+  <script src="./lib/mindar-image-aframe.prod.js"></script>
+</head>
+<body>
+  <a-scene
+    mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 2"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+    embedded
+  >
+    <a-assets>
+      <a-asset-item id="pizza" src="./assets/geom/frac_pizza.glb"></a-asset-item>
+      <video id="strokevid" src="./assets/chinese/strokeorder.mp4" loop muted playsinline></video>
+      <audio id="ping" src="./assets/sfx/ping.mp3"></audio>
+    </a-assets>
+
+    <!-- Target 0: 3D model -->
+    <a-entity mindar-image-target="targetIndex: 0">
+      <a-gltf-model src="#pizza" scale="0.2 0.2 0.2" rotation="-90 0 0"></a-gltf-model>
+    </a-entity>
+
+    <!-- Target 1: Video -->
+    <a-entity mindar-image-target="targetIndex: 1">
+      <a-plane src="#strokevid" width="1" height="1" rotation="-90 0 0"></a-plane>
+    </a-entity>
+
+    <a-camera position="0 0 0"></a-camera>
+  </a-scene>
+</body>
+</html>
