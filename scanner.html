@@ -1,124 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>WebAR Scanner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Local libs (no CDN) -->
-  <script src="./lib/aframe.min.js"></script>
-  <script src="./lib/mindar-image-aframe.prod.js"></script>
-
-  <style>
-    body { margin:0; background:#000; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    #ui { position:fixed; top:0; left:0; right:0; z-index:3; display:flex; gap:.5rem; align-items:center; padding:.5rem .75rem; color:#eee; }
-    #badge { background:#111; padding:.2rem .5rem; border-radius:.4rem; font-weight:600; }
-    #status { opacity:.9; }
-  </style>
-</head>
-<body>
-  <div id="ui">
-    <div id="badge">WebAR Scanner</div>
-    <div id="status">Point camera at target image…</div>
-  </div>
-
-  <a-scene
-    mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 2"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false"
-    renderer="antialias:true, physicallyCorrectLights:true"
-    embedded
-  >
-    <a-assets>
-      <!-- Your assets (paths kept as per your repo) -->
-      <a-asset-item id="pizza" src="./assets/geom/2CylinderEngine.glb"></a-asset-item>
-
-      <!-- Mobile video best-practice flags -->
-      <video id="strokevid"
-             src="./assets/chinese/strokeorder.mp4"
-             loop muted playsinline webkit-playsinline preload="auto"
-             crossorigin="anonymous"></video>
-
-      <audio id="ping" src="./assets/sfx/ping.mp3" preload="auto"></audio>
-    </a-assets>
-
-    <!-- Subtle grid cue: appears when any target is tracked -->
-    <a-entity id="grid" visible="false" position="0 -0.001 0" rotation="-90 0 0">
-      <a-plane width="5" height="5" material="color:#00ffff; opacity:0.06; wireframe:true"></a-plane>
-    </a-entity>
-
-    <!-- TARGET 0: 3D model + BIG green box so it's impossible to miss -->
-    <a-entity mindar-image-target="targetIndex: 0">
-      <a-box color="#39FF14" depth="0.30" height="0.30" width="0.30"
-             position="0 0 0" rotation="-90 0 0"></a-box>
-
-      <a-gltf-model src="#pizza"
-                    position="0 0 0"
-                    rotation="-90 0 0"
-                    scale="0.40 0.40 0.40"></a-gltf-model>
-    </a-entity>
-
-    <!-- TARGET 1: blue frame + video plane (tap to play/pause) -->
-    <a-entity mindar-image-target="targetIndex: 1">
-      <a-plane color="#2233ff" width="1.06" height="1.06"
-               position="0 0 -0.01" rotation="-90 0 0"></a-plane>
-
-      <a-plane id="strokePlane" src="#strokevid" width="1" height="1"
-               position="0 0 0" rotation="-90 0 0"></a-plane>
-    </a-entity>
-
-    <!-- Camera (MindAR provides pose) -->
-    <a-camera position="0 0 0"></a-camera>
-  </a-scene>
-
-  <script>
-    // Simple UX + logging to isolate issues quickly
-    const $ = s => document.querySelector(s);
-    const statusEl = $('#status');
-    const scene = document.querySelector('a-scene');
-    const grid = $('#grid');
-
-    document.addEventListener('DOMContentLoaded', () => {
-      // AR lifecycle logs
-      scene.addEventListener('arReady', () => {
-        console.log('[AR] ready');
-        statusEl.textContent = 'AR ready — aim at your target image';
-      });
-      scene.addEventListener('arError', ev => {
-        console.error('[AR] error', ev);
-        statusEl.textContent = 'AR error — see console logs';
-      });
-
-      // Target tracking logs (shows which index was found)
-      let tracking = 0;
-      scene.addEventListener('targetFound', ev => {
-        tracking++;
-        grid.setAttribute('visible', true);
-        console.log('[AR] targetFound', ev.detail);
-        statusEl.textContent = `Target found (index ${ev.detail?.index ?? '?'})`;
-      });
-      scene.addEventListener('targetLost', ev => {
-        tracking = Math.max(0, tracking - 1);
-        if (!tracking) grid.setAttribute('visible', false);
-        console.log('[AR] targetLost', ev.detail);
-        statusEl.textContent = tracking ? 'Multiple targets tracking…' : 'Point camera at target image…';
-      });
-
-      // Tap-to-play/pause for mobile video policies
-      const vid = document.getElementById('strokevid');
-      const plane = document.getElementById('strokePlane');
-      if (plane && vid) {
-        plane.classList.add('interactive');
-        plane.addEventListener('click', async () => {
-          try {
-            if (vid.paused) { await vid.play(); }
-            else { vid.pause(); }
-          } catch (e) {
-            console.warn('Video play/pause blocked:', e);
-          }
-        });
-      }
-    });
-  </script>
-</body>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8">
+    <title>WebAR Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <style>
+      body { margin:0; background:#000; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+      #ui { position:fixed; top:0; left:0; right:0; z-index:3; display:flex; gap:.5rem; align-items:center; padding:.5rem .75rem; color:#eee; }
+      #badge { background:#111; padding:.2rem .5rem; border-radius:.4rem; font-weight:600; }
+      #status { opacity:.9; }
+    </style>  
+    
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  </head>
+  <body>
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-plane color="blue" opaciy="0.5" position="0 0 0" height="0.552" width="1" rotation="0 0 0"></a-plane>
+      </a-entity>
+    </a-scene>
+  </body>
 </html>
