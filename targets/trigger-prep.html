@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AR Trigger Prep • Offline</title>
+  <style>
+    :root{--bg:#0b0f13;--card:#121821;--ink:#e8eef8;--muted:#9fb0c6;--accent:#43d6b5;}
+    html,body{height:100%;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin:0 0 8px}
+    .row{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+    .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 8px 24px #0006}
+    .drop{display:grid;place-items:center;border:2px dashed #2a3546;border-radius:16px;padding:24px;min-height:160px}
+    .drop.drag{border-color:var(--accent);}
+    .files{display:grid;gap:8px;margin-top:12px}
+    .file{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center;background:#0e141d;border:1px solid #1f2a3a;border-radius:12px;padding:8px}
+    .thumb{width:72px;height:72px;border-radius:8px;background:#000 center/cover no-repeat}
+    progress{width:100%;height:8px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px}
+    .btn{background:var(--accent);color:#03252d;border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    small{color:var(--muted)}
+    code{background:#0a1220;padding:2px 6px;border-radius:6px}
+    .pill{display:inline-block;background:#1b2535;border:1px solid #2a364a;padding:2px 8px;border-radius:999px;margin-left:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AR Trigger Prep <span class="pill">Offline</span></h1>
+    <p>Drop target images here. This tool checks suitability for <b>image-based AR</b>, renames them to <code>target0.jpg</code>, <code>target1.jpg</code>…, and zips a <code>targets/</code> folder with a README and manifest. Use the MindAR compiler separately to produce <code>targets.mind</code>.</p>
+
+    <div class="row">
+      <div class="card">
+        <div id="drop" class="drop">
+          <div>
+            <b>Drag & drop</b> images (JPG/PNG), or <label style="text-decoration:underline;cursor:pointer"><input id="file" type="file" accept="image/*" multiple hidden>browse</label>
+            <div><small>Tips: high contrast, unique details, avoid glossy reflections.</small></div>
+          </div>
+        </div>
+        <div id="files" class="files"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Export</h3>
+        <ol>
+          <li>Click <b>Download ZIP</b> → you get <code>targets.zip</code>.</li>
+          <li>Run the compiler (Node):<br>
+            <code>npx mindar-cli compile -i ./targets -o ./targets/targets.mind</code></li>
+          <li>Use <code>targets/targets.mind</code> in your WebAR page.</li>
+        </ol>
+        <button id="zipBtn" class="btn" disabled>Download ZIP</button>
+        <div style="margin-top:10px"><small id="count">No files yet.</small></div>
+        <hr style="border-color:#223044">
+        <p><b>What the scores mean</b></p>
+        <ul>
+          <li><b>Sharpness</b> (Laplacian): focus / crisp edges.</li>
+          <li><b>Edge Density</b> (Sobel): texture & features.</li>
+          <li><b>Entropy</b>: information richness (avoid flat areas).</li>
+        </ul>
+        <p><small>Good targets typically: Sharpness ≥ 50, Edge ≥ 12, Entropy ≥ 3.5.</small></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script>
+    const drop=document.getElementById('drop');
+    const file=document.getElementById('file');
+    const filesDiv=document.getElementById('files');
+    const zipBtn=document.getElementById('zipBtn');
+    const count=document.getElementById('count');
+    const state={items:[]};
+
+    function onFiles(list){
+      const arr=[...list].filter(f=>/image\//.test(f.type));
+      arr.forEach(f=>{
+        const url=URL.createObjectURL(f);
+        const img=new Image();
+        img.onload=()=>{URL.revokeObjectURL(url);processImage(img,f);};
+        img.src=url;
+      });
+    }
+    drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag');});
+    drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+    drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');onFiles(e.dataTransfer.files);});
+    file.addEventListener('change',e=>onFiles(e.target.files));
+
+    function processImage(img,file){
+      const maxSide=640,scale=Math.min(1,maxSide/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);const data=ctx.getImageData(0,0,w,h);
+      const gray=new Float32Array(w*h);
+      for(let i=0,j=0;i<data.data.length;i+=4,j++){const r=data.data[i],g=data.data[i+1],b=data.data[i+2];gray[j]=0.299*r+0.587*g+0.114*b;}
+      const sharp=laplacianVar(gray,w,h);const edge=sobelDensity(gray,w,h);const ent=entropy(gray);const score=scoreHeuristic(sharp,edge,ent);
+      const idx=state.items.length,targetName=`target${idx}.jpg`;
+      state.items.push({file,targetName,sharp,edge,ent,score,w:img.width,h:img.height,dataUrl:c.toDataURL('image/jpeg',0.9)});
+      renderList();
+    }
+
+    function laplacianVar(gray,w,h){
+      const k=[0,1,0,1,-4,1,0,1,0];let mean=0,count=0;const resp=new Float32Array(w*h);
+      for(let y=1;y<h-1;y++){for(let x=1;x<w-1;x++){let acc=0,n=0;
+        for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++)acc+=gray[(y+j)*w+(x+i)]*k[n++];
+        resp[y*w+x]=acc;mean+=acc;count++;}}mean/=count;let v=0;for(let i=0;i<resp.length;i++){const d=resp[i]-mean;v+=d*d;}return Math.sqrt(v/count);
+    }
+    function sobelDensity(gray,w,h){
+      const gx=[-1,0,1,-2,0,2,-1,0,1],gy=[-1,-2,-1,0,0,0,1,2,1];let sum=0,count=0;
+      for(let y=1;y<h-1;y++){for(let x=1;x<w-1;x++){let sx=0,sy=0,n=0;
+        for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const v=gray[(y+j)*w+(x+i)];sx+=v*gx[n];sy+=v*gy[n];n++;}
+        const mag=Math.hypot(sx,sy);sum+=mag>100?1:0;count++;}}return(sum/count)*100;
+    }
+    function entropy(gray){const hist=new Uint32Array(256);let n=gray.length;
+      for(let i=0;i<n;i++){hist[Math.max(0,Math.min(255,gray[i]|0))]++;}let H=0;
+      for(let i=0;i<256;i++){if(!hist[i])continue;const p=hist[i]/n;H-=p*Math.log2(p);}return H;
+    }
+    function scoreHeuristic(sharp,edge,ent){
+      const s=Math.min(1,sharp/80),e=Math.min(1,edge/20),t=Math.min(1,ent/4);
+      return(0.5*s+0.3*e+0.2*t)*100;
+    }
+    function renderList(){
+      filesDiv.innerHTML='';
+      state.items.forEach((it,i)=>{
+        const row=document.createElement('div');row.className='file';
+        const th=document.createElement('div');th.className='thumb';th.style.backgroundImage=`url(${it.dataUrl})`;
+        const meta=document.createElement('div');
+        meta.innerHTML=`<div><b>${it.targetName}</b> <small>(${it.w}×${it.h})</small></div>
+          <div class="grid">
+            <div><small>Sharpness</small><br><b>${it.sharp.toFixed(1)}</b></div>
+            <div><small>Edge</small><br><b>${it.edge.toFixed(1)}</b></div>
+            <div><small>Entropy</small><br><b>${it.ent.toFixed(2)}</b></div>
+          </div>
+          <div style="margin-top:6px"><small>Score:</small> <b>${it.score.toFixed(0)}</b>/100</div>`;
+        const act=document.createElement('div');
+        const up=document.createElement('button');up.textContent='▲';up.className='btn';up.style.padding='6px 10px';up.onclick=()=>move(i,-1);
+        const dn=document.createElement('button');dn.textContent='▼';dn.className='btn';dn.style.padding='6px 10px';dn.onclick=()=>move(i,1);
+        act.append(up,dn);row.append(th,meta,act);filesDiv.append(row);
+      });
+      count.textContent=`${state.items.length} image(s) ready.`;zipBtn.disabled=state.items.length===0;
+    }
+    function move(i,dir){const j=i+dir;if(j<0||j>=state.items.length)return;[state.items[i],state.items[j]]=[state.items[j],state.items[i]];
+      state.items.forEach((it,k)=>it.targetName=`target${k}.jpg`);renderList();}
+    zipBtn.addEventListener('click',async()=>{
+      const zip=new JSZip();const folder=zip.folder('targets');
+      const manifest=state.items.map((it,idx)=>({index:idx,file:it.targetName,sharpness:it.sharp,edgeDensity:it.edge,entropy:it.ent,score:it.score}));
+      folder.file('manifest.json',JSON.stringify({generatedAt:new Date().toISOString(),items:manifest},null,2));
+      const readme=`AR Trigger Prep\\n\\nFiles:\\n- target0.jpg .. target${state.items.length-1}.jpg\\n- manifest.json\\n\\nCompile MindAR targets:\\n  npx mindar-cli compile -i ./targets -o ./targets/targets.mind\\n`;
+      folder.file('README.txt',readme);
+      for(const it of state.items){const blob=dataURLtoBlob(it.dataUrl);folder.file(it.targetName,blob);}
+      const blob=await zip.generateAsync({type:'blob'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='targets.zip';a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    });
+    function dataURLtoBlob(dataURL){const[h,b]=dataURL.split(',');const mime=h.match(/:(.*?);/)[1];const bin=atob(b);const u8=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);return new Blob([u8],{type:mime});}
+  </script>
+</body>
+</html>
