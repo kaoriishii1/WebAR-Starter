@@ -1,136 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>WebAR • Clickable Video</title>
-  <script src="./lib/aframe.min.js"></script>
-  <script src="./lib/mindar-image-aframe.prod.js"></script>
-  <style>
-    body { margin:0; background:#000; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-    #hud { position:fixed; top:0; left:0; right:0; z-index:3; display:flex; gap:.5rem; padding:.5rem .75rem; color:#eee; }
-    #badge { background:#111; padding:.2rem .5rem; border-radius:.4rem; font-weight:600; }
-    #status { opacity:.9; }
-    #gate {
-      position:fixed; inset:0; display:grid; place-items:center; z-index:4;
-      background:linear-gradient(180deg,#0b0f13, #000a);
-    }
-    #gate button {
-      font-size:16px; font-weight:700; padding:.8rem 1.1rem; border-radius:12px; border:0; cursor:pointer;
-    }
-  </style>
-</head>
-<body>
-  <!-- one-time media unlock (user gesture) -->
-  <div id="gate">
-    <div style="text-align:center; color:#e8eef8">
-      <h2 style="margin:.25rem 0">Enable media</h2>
-      <p style="opacity:.9; margin:.25rem 0 .75rem">Tap once to allow video playback in AR.</p>
-      <button id="enableBtn">I’m ready</button>
-    </div>
-  </div>
 
-  <div id="hud">
-    <div id="badge">WebAR</div>
-    <div id="status">Tap “I’m ready”, then point at your target…</div>
-  </div>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="./lib/aframe.min.js"></script>
+    <script src="./lib/mindar-image-aframe.prod.js"></script>
+  </head>
+  <body>
+    <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+      <a-assets>
+		<video id="myVideo"
+         src="./targets/target0.mp4"
+         loop
+         muted
+         playsinline
+         webkit-playsinline
+         preload="auto"
+         crossorigin="anonymous"></video>
+      </a-assets>
 
-  <a-scene
-    mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 1"
-    color-space="sRGB"
-    renderer="colorManagement:true, physicallyCorrectLights:true, antialias:true"
-    vr-mode-ui="enabled:false"
-    device-orientation-permission-ui="enabled:false"
-    embedded
-  >
-    <a-assets>
-      <!-- Keep muted for mobile autoplay; we’ll let the user tap to toggle play/pause -->
-      <video id="myVideo"
-             src="./targets/target0.mp4"
-             loop
-             muted
-             playsinline
-             webkit-playsinline
-             preload="auto"
-             crossorigin="anonymous"></video>
-    </a-assets>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- Make clicks/taps hit objects with class .clickable -->
-    <a-camera position="0 0 0"
-              look-controls="enabled:false"
-              cursor="fuse:false; rayOrigin:mouse;"
-              raycaster="near:0.01; far:10000; objects:.clickable"></a-camera>
-
-    <!-- Target 0: video plane -->
-    <a-entity id="t0" mindar-image-target="targetIndex: 0">
-      <!-- thin backdrop so you always see the anchor -->
-      <a-plane color="#2233ff" width="1.06" height="0.61" position="0 0 -0.005"></a-plane>
-
-      <a-plane id="videoPlane"
-               class="clickable"
-               src="#myVideo"
-               width="1"
-               height="0.56"
-               position="0 0 0.05"
-               rotation="0 0 0"></a-plane>
-    </a-entity>
-
-    <!-- optional grid cue while tracking -->
-    <a-entity id="grid" visible="false" position="0 -0.001 0" rotation="-90 0 0">
-      <a-plane width="5" height="5" material="color:#00ffff; opacity:0.05; wireframe:true"></a-plane>
-    </a-entity>
-  </a-scene>
-
-  <script>
-    const $ = s => document.querySelector(s);
-    const statusEl = $('#status');
-    const gate = $('#gate');
-    const enableBtn = $('#enableBtn');
-    const scene = document.querySelector('a-scene');
-    const grid = $('#grid');
-    const vid = document.getElementById('myVideo');
-    const plane = document.getElementById('videoPlane');
-    const anchor0 = document.getElementById('t0');
-
-    // 1) One-time user gesture to unlock media on mobile
-    enableBtn.addEventListener('click', async () => {
-      try {
-        // Kick the video once (muted) to satisfy autoplay policies
-        await vid.play();
-        vid.pause();
-      } catch (e) { /* ignore */ }
-      gate.style.display = 'none';
-      statusEl.textContent = 'AR ready — point at the target image';
-    });
-
-    // 2) Let users tap the plane to play/pause
-    plane.addEventListener('click', async () => {
-      try {
-        if (vid.paused) { await vid.play(); statusEl.textContent = 'Playing video…'; }
-        else { vid.pause(); statusEl.textContent = 'Paused.'; }
-      } catch (e) {
-        console.warn('Video play blocked:', e);
-      }
-    });
-
-    // 3) Helpful scene/target feedback
-    let tracking = 0;
-    scene.addEventListener('arReady', () => console.log('[AR] ready'));
-    scene.addEventListener('arError', e => console.error('[AR] error', e));
-    scene.addEventListener('targetFound', () => { tracking++; grid.setAttribute('visible', true); });
-    scene.addEventListener('targetLost',  () => { tracking=Math.max(0,tracking-1); if(!tracking) grid.setAttribute('visible', false); });
-
-    // Auto play/pause when the specific target is seen/lost
-    anchor0.addEventListener('targetFound', async () => {
-      try { if (vid.paused) await vid.play(); } catch(e) {}
-    });
-    anchor0.addEventListener('targetLost', () => {
-      vid.pause();
-      vid.currentTime = 0; // reset
-    });
-
-    // 4) Extra safety: load the media as soon as assets are ready
-    document.addEventListener('DOMContentLoaded', () => vid.load());
-  </script>
-</body>
+      <a-entity mindar-image-target="targetIndex: 0">
+  <a-plane id="videoPlane"
+           src="#myVideo"
+           width="1"
+           height="0.56"
+           rotation="0 0 0"
+           position="0 0 0.1"></a-plane>
+      </a-entity>
+    </a-scene>
+  </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
